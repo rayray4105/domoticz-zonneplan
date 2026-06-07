@@ -1,130 +1,130 @@
-# Domoticz Zonneplan Energie Plugin
+# Domoticz Zonneplan Energy Plugin
 
-Een Python plugin voor [Domoticz](https://www.domoticz.com/) die je Zonneplan thuisbatterij (Nexus) en elektriciteitscontract integreert, inclusief ondersteuning voor het **Energy Dashboard**.
+An unofficial Python plugin for [Domoticz](https://www.domoticz.com/) that integrates your Zonneplan home battery (Nexus) and electricity contract, including support for the **Energy Dashboard**.
 
-> Onofficiële community plugin — niet gelieerd aan Zonneplan B.V.
+> Unofficial community plugin — not affiliated with Zonneplan B.V.
 
 ---
 
-## Inhoud
+## Contents
 
-- [Functionaliteit](#functionaliteit)
-- [Vereisten](#vereisten)
-- [Installatie](#installatie)
-- [Energy Dashboard instellen](#energy-dashboard-instellen)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Energy Dashboard setup](#energy-dashboard-setup)
 - [Devices](#devices)
-- [Token vernieuwen](#token-vernieuwen)
-- [Probleemoplossing](#probleemoplossing)
+- [Token renewal](#token-renewal)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## Functionaliteit
+## Features
 
-### Zonneplan Nexus Thuisbatterij
+### Zonneplan Nexus Home Battery
 
-| Device | Eenheid | Omschrijving |
+| Device | Unit | Description |
 |---|---|---|
-| Batterij Laadniveau | % | Huidige laadtoestand (SoC) |
-| Batterij Vermogen | W | Huidig laad-/ontlaadvermogen |
-| Zonneplan Opgeladen | kWh | Energie in de batterij geladen vandaag |
-| Zonneplan Ontladen | kWh | Energie uit de batterij geleverd vandaag |
-| Batterij Status | tekst | Opladen / Ontladen / Inactief / Stand-by |
-| Inverter Status | tekst | Status van de inverter |
-| Batterij Model | tekst | Apparaatmodel |
-| Batterij Cycli | — | Totaal aantal laadcycli |
-| Backup Capaciteit | Wh | Bruikbare backup-capaciteit |
-| Verdiend Vandaag | € | Opbrengst vandaag |
-| Gemiddeld per Dag | € | Gemiddelde dagopbrengst |
-| Totaal Verdiend | € | Totale opbrengst |
-| Resultaat Deze Maand | € | Financieel resultaat deze maand |
-| Resultaat Vorige Maand | € | Financieel resultaat vorige maand |
-| Resultaat Dit Jaar | € | Financieel resultaat dit jaar |
-| Resultaat Vorig Jaar | € | Financieel resultaat vorig jaar |
-| Laatste / Eerste Meting | datum | Tijdstip van meting |
-| Besturingsmodus | tekst | home_optimization / dynamic_charging / self_consumption |
+| Battery Level | % | Current state of charge (SoC) |
+| Battery Power | W | Current charge/discharge power |
+| Zonneplan Charged | kWh | Energy charged into battery today |
+| Zonneplan Discharged | kWh | Energy delivered from battery today |
+| Battery State | text | Charging / Discharging / Idle / Standby |
+| Inverter State | text | Current inverter status |
+| Battery Model | text | Device model name |
+| Battery Cycles | — | Total charge cycle count |
+| Backup Capacity | Wh | Usable backup power capacity |
+| Earned Today | € | Revenue today |
+| Average per Day | € | Average daily revenue |
+| Total Earned | € | Total lifetime revenue |
+| Result This Month | € | Financial result this month |
+| Result Last Month | € | Financial result last month |
+| Result This Year | € | Financial result this year |
+| Result Last Year | € | Financial result last year |
+| Last / First Measurement | datetime | Timestamp of measurement |
+| Control Mode | text | home_optimization / dynamic_charging / self_consumption |
 
-**Binary schakelaars (aan/uit):**
-Dynamic Charging · Load Balancing · Load Balancing Overload · Handmatige Bediening · Netcongestie · Home Optimalisatie · Home Optimalisatie Actief · Zelfconsumptie · Backup Stroom Actief
+**Binary switches (on/off):**
+Dynamic Charging · Load Balancing · Load Balancing Overload · Manual Control · Grid Congestion · Home Optimization · Home Optimization Active · Self Consumption · Backup Power Active
 
 ---
 
-### Zonneplan Elektriciteitscontract
+### Zonneplan Electricity Contract
 
-| Device | Eenheid | Omschrijving |
+| Device | Unit | Description |
 |---|---|---|
-| Huidig Tarief | €/kWh | Actueel dynamisch tarief (update elk uur) |
-| Tariefgroep | tekst | Dal / Piek / Normaal |
-| Duurzaamheidsscore | % | Duurzaamheid van huidig stroomverbruik |
-| Status Tip | tekst | Tip op basis van huidig tarief |
-| Huidig Verbruik ⁽*⁾ | W | Gemeten verbruik op dit moment |
-| Verbruik Gemeten Om ⁽*⁾ | datum | Tijdstip van verbruiksmeting |
-| Status Bericht ⁽*⁾ | tekst | Statusmelding van Zonneplan |
-| Forecast Tarief +1u t/m +8u ⁽*⁾ | €/kWh | Verwacht tarief komende uren |
-| Forecast Tariefgroep +1u t/m +8u ⁽*⁾ | tekst | Dal/Piek/Normaal komende uren |
+| Current Tariff | €/kWh | Live dynamic tariff (updated every hour) |
+| Tariff Group | text | Off-peak / Peak / Normal |
+| Sustainability Score | % | Sustainability of current electricity usage |
+| Status Tip | text | Tip based on current tariff |
+| Current Usage ⁽*⁾ | W | Real-time power consumption |
+| Usage Measured At ⁽*⁾ | datetime | Timestamp of usage measurement |
+| Status Message ⁽*⁾ | text | Status message from Zonneplan |
+| Forecast Tariff +1h to +8h ⁽*⁾ | €/kWh | Expected tariff for the next 8 hours |
+| Forecast Tariff Group +1h to +8h ⁽*⁾ | text | Off-peak/Peak/Normal for next hours |
 
-*⁽*⁾ Standaard uitgeschakeld — activeer via **Setup → Devices → gebruik het oog-icoon**.*
+*⁽*⁾ Disabled by default — enable via **Setup → Devices** (click the eye icon).*
 
 ---
 
-## Vereisten
+## Requirements
 
-- Domoticz met Python plugin support (versie 2020.2 of nieuwer)
+- Domoticz with Python plugin support (version 2020.2 or newer)
 - Python 3.7+
-- Een actief Zonneplan account met thuisbatterij en/of elektriciteitscontract
+- An active Zonneplan account with a home battery and/or electricity contract
 
 ---
 
-## Installatie
+## Installation
 
-### Stap 1 — Plugin downloaden
+### Step 1 — Download the plugin
 
 ```bash
 git clone https://github.com/rayray4105/domoticz-zonneplan.git /home/pi/domoticz/plugins/Zonneplan
 cd /home/pi/domoticz/plugins/Zonneplan
 ```
 
-### Stap 2 — Eenmalige authenticatie
+### Step 2 — One-time authentication
 
 ```bash
 python3 setup_auth.py
 ```
 
-- Voer je Zonneplan e-mailadres in
-- Klik op de link in de e-mail die Zonneplan stuurt
-- Druk op Enter — het script haalt automatisch je tokens op
-- Het bestand `zonneplan_token.json` wordt opgeslagen in de plugin-map
+- Enter your Zonneplan email address
+- Click the link in the email Zonneplan sends you
+- Press Enter — the script will automatically retrieve your tokens
+- The file `zonneplan_token.json` is saved in the plugin folder
 
-### Stap 3 — Domoticz herstarten
+### Step 3 — Restart Domoticz
 
 ```bash
 sudo systemctl restart domoticz
 ```
 
-### Stap 4 — Hardware toevoegen
+### Step 4 — Add hardware
 
-1. Ga naar **Setup → Hardware**
-2. Klik **Add**
-3. Kies type: **Zonneplan Energie**
-4. Stel het gewenste polling interval in
-5. Klik **Add**
+1. Go to **Setup → Hardware**
+2. Click **Add**
+3. Select type: **Zonneplan Energie**
+4. Set the desired polling interval
+5. Click **Add**
 
-De plugin detecteert automatisch welke contracten aanwezig zijn (batterij en/of elektriciteit) en maakt de bijbehorende devices aan.
-
----
-
-## Energy Dashboard instellen
-
-1. Ga naar **Setup → More Options → Energy Dashboard**
-2. Klik op het potlood bij **Accu / Batterij**
-3. Voeg toe:
-   - **Zonneplan Opgeladen** → als *Verbruik* (energie die in de accu gaat)
-   - **Zonneplan Ontladen** → als *Levering* (energie die uit de accu komt)
+The plugin automatically detects which contracts are present (battery and/or electricity) and creates the corresponding devices.
 
 ---
 
-## Token vernieuwen
+## Energy Dashboard setup
 
-De plugin vernieuwt tokens automatisch via de refresh token. Als het vernieuwen mislukt (bijv. na een lange offline periode), voer dan `setup_auth.py` opnieuw uit:
+1. Go to **Setup → More Options → Energy Dashboard**
+2. Click the pencil icon next to **Battery**
+3. Add:
+   - **Zonneplan Charged** → as *Usage* (energy going into the battery)
+   - **Zonneplan Discharged** → as *Return* (energy coming out of the battery)
+
+---
+
+## Token renewal
+
+The plugin automatically renews tokens using the refresh token. If renewal fails (e.g. after a long offline period), run `setup_auth.py` again:
 
 ```bash
 cd /home/pi/domoticz/plugins/Zonneplan
@@ -134,30 +134,30 @@ sudo systemctl restart domoticz
 
 ---
 
-## Probleemoplossing
+## Troubleshooting
 
-**Plugin verschijnt niet in de hardware-lijst**
-Controleer of Python plugins zijn ingeschakeld in Domoticz. Zorg dat de map heet `Zonneplan` (hoofdlettergevoelig) en dat `plugin.py` er direct in staat.
+**Plugin does not appear in the hardware list**
+Make sure Python plugins are enabled in Domoticz. The folder must be named `Zonneplan` (case-sensitive) and `plugin.py` must be directly inside it.
 
-**"Geen token gevonden"**
-Voer `setup_auth.py` uit en controleer of `zonneplan_token.json` in de plugin-map staat.
+**"No token found"**
+Run `setup_auth.py` and verify that `zonneplan_token.json` exists in the plugin folder.
 
-**Tarieven komen niet binnen**
-Voer `python3 test_api.py` uit. Het script toont de exacte sleutelnotatie van de API zodat eventuele afwijkingen zichtbaar worden.
+**Tariffs are not updating**
+Run `python3 test_api.py` — it shows the exact key format used by the API so any mismatches are visible.
 
-**Debug inschakelen**
-Zet *Debug* op *Ja* in de hardware-instellingen. Alle ruwe API-data verschijnt dan in **Setup → Log**.
+**Enable debug logging**
+Set *Debug* to *Yes* in the hardware settings. All raw API data will appear in **Setup → Log**.
 
-**API testen zonder Domoticz**
+**Test the API without Domoticz**
 ```bash
 cd /home/pi/domoticz/plugins/Zonneplan
 python3 test_api.py
 ```
-Toont alle ruwe en geconverteerde waarden van batterij én elektriciteitscontract.
+Shows all raw and converted values for both battery and electricity contract.
 
 ---
 
-## Gerelateerd
+## Related
 
-- [Zonneplan Home Assistant integratie](https://github.com/fsaris/home-assistant-zonneplan-one) — de HA plugin waarop dit gebaseerd is
+- [Zonneplan Home Assistant integration](https://github.com/fsaris/home-assistant-zonneplan-one) — the HA plugin this is based on
 - [Domoticz Python Plugin Framework](https://www.domoticz.com/wiki/Developing_a_Python_plugin)
