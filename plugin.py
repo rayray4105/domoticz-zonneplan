@@ -266,26 +266,35 @@ class BasePlugin:
         if self._debug:
             Domoticz.Log(f"Zonneplan meta: {json.dumps(meta)}")
 
-        # State of Charge (%)
-        soc = meta.get("state_of_charge")
-        if soc is not None:
-            Devices[UNIT_SOC].Update(nValue=0, sValue=str(round(float(soc), 1)))
+        # State of Charge (%) — raw waarde is tienden van procenten (factor 0.1)
+        soc_raw = meta.get("state_of_charge")
+        if soc_raw is not None:
+            soc = round(float(soc_raw) * 0.1, 1)
+            Devices[UNIT_SOC].Update(nValue=0, sValue=str(soc))
+        else:
+            soc = None
 
-        # Huidig vermogen in Watt
+        # Huidig vermogen in Watt — geen conversiefactor
         # power_ac: positief = laden, negatief = ontladen
         power_ac = meta.get("power_ac")
         if power_ac is not None:
             Devices[UNIT_POWER].Update(nValue=0, sValue=f"{round(float(power_ac))};0")
 
-        # Vandaag opgeladen kWh (energie IN de batterij)
-        production = meta.get("production_day")
-        if production is not None:
-            Devices[UNIT_CHARGED].Update(nValue=0, sValue=f"0;{round(float(production), 3)}")
+        # Vandaag opgeladen kWh — raw waarde is in Wh (factor 0.001)
+        production_raw = meta.get("production_day")
+        if production_raw is not None:
+            production = round(float(production_raw) * 0.001, 3)
+            Devices[UNIT_CHARGED].Update(nValue=0, sValue=f"0;{production}")
+        else:
+            production = None
 
-        # Vandaag ontladen kWh (energie UIT de batterij)
-        delivery = meta.get("delivery_day")
-        if delivery is not None:
-            Devices[UNIT_DISCHARGED].Update(nValue=0, sValue=f"0;{round(float(delivery), 3)}")
+        # Vandaag ontladen kWh — raw waarde is in Wh (factor 0.001)
+        delivery_raw = meta.get("delivery_day")
+        if delivery_raw is not None:
+            delivery = round(float(delivery_raw) * 0.001, 3)
+            Devices[UNIT_DISCHARGED].Update(nValue=0, sValue=f"0;{delivery}")
+        else:
+            delivery = None
 
         # Status tekst
         battery_state = meta.get("battery_state", "")

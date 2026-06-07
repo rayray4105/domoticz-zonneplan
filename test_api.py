@@ -104,21 +104,30 @@ def main():
                     for key, value in sorted(meta.items()):
                         print(f"  {key:<40} = {value}")
 
-                section("Relevante waarden voor Domoticz")
-                fields = {
-                    "state_of_charge":              "Laadniveau (%)",
-                    "power_ac":                     "Vermogen (W)",
-                    "battery_state":                "Status",
-                    "inverter_state":               "Inverter status",
-                    "production_day":               "Opgeladen vandaag (kWh)",
-                    "delivery_day":                 "Ontladen vandaag (kWh)",
-                    "total_earned":                 "Totaal verdiend (€)",
-                    "cycle_count":                  "Cycli",
-                    "backup_power_usable_capacity_wh": "Backup capaciteit (Wh)",
-                    "last_measured_at":             "Laatste meting",
-                }
-                for key, label in fields.items():
-                    val = meta.get(key, "⚠ niet aanwezig in API")
+                section("Relevante waarden voor Domoticz (na conversie)")
+                # (key, label, factor)
+                fields = [
+                    ("state_of_charge",              "Laadniveau (%)",          0.1),
+                    ("power_ac",                     "Vermogen (W)",            1),
+                    ("battery_state",                "Status",                  None),
+                    ("inverter_state",               "Inverter status",         None),
+                    ("production_day",               "Opgeladen vandaag (kWh)", 0.001),
+                    ("delivery_day",                 "Ontladen vandaag (kWh)",  0.001),
+                    ("total_earned",                 "Totaal verdiend (€)",     0.0000001),
+                    ("total_day",                    "Verdiend vandaag (€)",    0.0000001),
+                    ("average_day",                  "Gemiddeld per dag (€)",   0.0000001),
+                    ("cycle_count",                  "Cycli",                   1),
+                    ("backup_power_usable_capacity_wh", "Backup capaciteit (Wh)", 1),
+                    ("last_measured_at",             "Laatste meting",          None),
+                ]
+                for key, label, factor in fields:
+                    raw = meta.get(key)
+                    if raw is None:
+                        val = "⚠ niet aanwezig in API"
+                    elif factor is None:
+                        val = raw
+                    else:
+                        val = f"{round(float(raw) * factor, 4)}  (raw: {raw})"
                     print(f"  {label:<35} {val}")
 
     if not battery_found:
