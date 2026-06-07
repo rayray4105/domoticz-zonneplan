@@ -62,17 +62,25 @@ def main():
     input("Druk op ENTER nadat je op de link hebt geklikt...\n")
 
     print("Eenmalig wachtwoord ophalen...")
-    for attempt in range(10):
+    otp = None
+    for attempt in range(20):
         try:
             resp = get(f"/auth/request/{uuid}")
-            otp = resp.get("data", {}).get("one_time_password")
-            if otp:
-                print(f"Eenmalig wachtwoord verkregen.")
+            auth_data = resp.get("data", {})
+            # API geeft het wachtwoord terug als "password" zodra is_activated=True
+            if auth_data.get("is_activated") and auth_data.get("password"):
+                otp = auth_data["password"]
+                print("Eenmalig wachtwoord verkregen.")
                 break
-        except Exception as e:
+            # Oudere API-versies gebruiken mogelijk "one_time_password"
+            if auth_data.get("one_time_password"):
+                otp = auth_data["one_time_password"]
+                print("Eenmalig wachtwoord verkregen (legacy veld).")
+                break
+        except Exception:
             pass
-        print(f"  Nog niet actief, nog eens proberen ({attempt + 1}/10)...")
-        time.sleep(3)
+        print(f"  Nog niet actief, nog eens proberen ({attempt + 1}/20)...")
+        time.sleep(5)
     else:
         print("Fout: kon geen eenmalig wachtwoord ophalen. Probeer opnieuw.")
         return
@@ -80,7 +88,8 @@ def main():
     print("Toegangstoken aanvragen...")
     resp = post("/oauth/token", {
         "grant_type": "one_time_password",
-        "one_time_password": otp,
+        "email": email,
+        "password": otp,
     })
 
     token_data = resp.get("data", resp)

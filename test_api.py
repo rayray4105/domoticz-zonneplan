@@ -208,7 +208,17 @@ def main():
         if summary_data:
             summary = summary_data.get("data", {})
 
-            section("ELEKTRICITEIT — alle top-level keys in summary")
+            section("ELEKTRICITEIT — live_measurements (indien aanwezig)")
+        live = summary.get("live_measurements", [])
+        if live:
+            for i, m in enumerate(live):
+                print(f"  live_measurements[{i}]:")
+                for k, v in m.items():
+                    print(f"    {k:<40} {v}")
+        else:
+            print("  (niet aanwezig in summary)")
+
+        section("ELEKTRICITEIT — alle top-level keys in summary")
             for key, val in summary.items():
                 if key == "price_per_date_and_hour":
                     print(f"  {key:<40} (dict met {len(val)} uren)")
