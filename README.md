@@ -89,10 +89,21 @@ cd /home/pi/domoticz/plugins/Zonneplan
 python3 setup_auth.py
 ```
 
-- Enter your Zonneplan email address
-- Click the link in the email Zonneplan sends you
-- Press Enter — the script will automatically retrieve your tokens
-- The file `zonneplan_token.json` is saved in the plugin folder
+The script supports two modes:
+
+**Automatic (IMAP)** — recommended
+- Enter your email address
+- Answer `y` when asked to use IMAP
+- The IMAP server is pre-filled based on your email domain (Gmail, Outlook, Yahoo, iCloud)
+- For Gmail: use an [App Password](https://myaccount.google.com/apppasswords) instead of your regular password
+- The script finds and clicks the confirmation link automatically
+
+**Manual fallback**
+- Answer `n` to skip IMAP
+- Click the link in the Zonneplan email yourself
+- Press Enter to continue
+
+In both cases the file `zonneplan_token.json` is saved in the plugin folder.
 
 ### Step 3 — Restart Domoticz
 
