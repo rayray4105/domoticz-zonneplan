@@ -1,6 +1,6 @@
 """
 <plugin key="ZonneplanEnergy" name="Zonneplan Energie" author="rayray4105"
-        version="3.0.0" externallink="https://github.com/rayray4105/domoticz-zonneplan">
+        version="3.1.0" externallink="https://github.com/rayray4105/domoticz-zonneplan">
     <description>
         <h2>Zonneplan Energie</h2><br/>
         Integreert Zonneplan thuisbatterij (Nexus) en elektriciteitscontract in Domoticz,
@@ -12,7 +12,6 @@
     <params>
         <param field="Mode1" label="Polling interval" width="150px" required="true">
             <options>
-                <option label="30 seconden" value="30"/>
                 <option label="1 minuut" value="60" default="true"/>
                 <option label="2 minuten" value="120"/>
                 <option label="5 minuten" value="300"/>
@@ -142,6 +141,9 @@ class BasePlugin:
         self._has_electricity = False
         self._last_summary_hour = -1   # tarieven alleen vernieuwen bij nieuw uur
 
+        # Rate limiting (discussie #89): bij 429 pauzeren we minimaal 60s
+        self._rate_limited_until = 0
+
     # ------------------------------------------------------------------
     # Domoticz lifecycle
     # ------------------------------------------------------------------
@@ -152,12 +154,12 @@ class BasePlugin:
             Domoticz.Debugging(1)
 
         try:
-            self._poll_ticks = max(1, int(Parameters["Mode1"]) // 30)
+            self._poll_ticks = max(2, int(Parameters["Mode1"]) // 30)  # min 60s
         except (ValueError, KeyError):
             self._poll_ticks = 2
 
         Domoticz.Heartbeat(30)
-        Domoticz.Log(f"Zonneplan plugin v3.0 gestart (poll elke {self._poll_ticks * 30}s)")
+        Domoticz.Log(f"Zonneplan plugin v3.1 gestart (poll elke {self._poll_ticks * 30}s)")
 
         self._create_devices()
         self._load_token()
@@ -337,12 +339,23 @@ class BasePlugin:
     # ------------------------------------------------------------------
 
     def _get(self, path):
+        if time.time() < self._rate_limited_until:
+            raise Exception("Rate limited — wacht even")
         url = BASE_URL + path
         h = dict(HEADERS)
         h["Authorization"] = f"Bearer {self._token['access_token']}"
         req = urllib.request.Request(url, headers=h)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                retry_after = int(e.headers.get("Retry-After", 60))
+                self._rate_limited_until = time.time() + retry_after
+                Domoticz.Error(
+                    f"Zonneplan API rate limit (429) — wacht {retry_after}s voor volgende poging."
+                )
+            raise
 
     def _post(self, path, data):
         url = BASE_URL + path

@@ -134,6 +134,13 @@ sudo systemctl restart domoticz
 
 ---
 
+## Known limitations
+
+**Zonneplan Discharged may include standby usage**
+The `delivery_day` field from the Zonneplan API can include the battery system's own standby power consumption, not just the energy actually delivered to your home. This matches what the Zonneplan app shows, but may differ slightly from your smart meter reading (discussed in [#151](https://github.com/fsaris/home-assistant-zonneplan-one/discussions/151)).
+
+---
+
 ## Troubleshooting
 
 **Plugin does not appear in the hardware list**
@@ -141,6 +148,12 @@ Make sure Python plugins are enabled in Domoticz. The folder must be named `Zonn
 
 **"No token found"**
 Run `setup_auth.py` and verify that `zonneplan_token.json` exists in the plugin folder.
+
+**403 Unauthorized / wrong UUID**
+The Zonneplan API returns multiple UUIDs. Always use the UUID from the `connections` array in the `/user-accounts/me` response — not the account-level UUID. The plugin handles this automatically, but if you're testing manually (e.g. Postman), this is a common pitfall (see [#148](https://github.com/fsaris/home-assistant-zonneplan-one/discussions/148), [#196](https://github.com/fsaris/home-assistant-zonneplan-one/discussions/196)).
+
+**429 Rate limit**
+The plugin automatically backs off when Zonneplan returns a 429 response and respects the `Retry-After` header. Minimum polling interval is 60 seconds. Do not lower this — Zonneplan has blocked IP addresses that generated excessive requests (see [#89](https://github.com/fsaris/home-assistant-zonneplan-one/discussions/89)).
 
 **Tariffs are not updating**
 Run `python3 test_api.py` — it shows the exact key format used by the API so any mismatches are visible.
