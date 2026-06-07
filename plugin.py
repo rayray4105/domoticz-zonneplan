@@ -1,14 +1,13 @@
 """
-<plugin key="ZonneplanBattery" name="Zonneplan Thuisbatterij" author="rdejager"
-        version="2.0.0" externallink="https://github.com/rayray4105/domoticz-zonneplan">
+<plugin key="ZonneplanEnergy" name="Zonneplan Energie" author="rayray4105"
+        version="3.0.0" externallink="https://github.com/rayray4105/domoticz-zonneplan">
     <description>
-        <h2>Zonneplan Thuisbatterij (Nexus)</h2><br/>
-        Toont alle beschikbare sensorwaarden van je Zonneplan thuisbatterij in Domoticz,
+        <h2>Zonneplan Energie</h2><br/>
+        Integreert Zonneplan thuisbatterij (Nexus) en elektriciteitscontract in Domoticz,
         inclusief ondersteuning voor het Energy Dashboard.<br/><br/>
         <b>Eerste gebruik:</b> voer <i>setup_auth.py</i> uit en kopieer
         <i>zonneplan_token.json</i> naar de plugin-map.<br/><br/>
-        <b>Devices die worden aangemaakt:</b> laadniveau, vermogen, opgeladen/ontladen kWh,
-        financiële resultaten, cycli, statussen, binary schakelaars en control mode.
+        Niet alle devices zijn actief — activeer ze via Setup &gt; Devices indien gewenst.
     </description>
     <params>
         <param field="Mode1" label="Polling interval" width="150px" required="true">
@@ -35,6 +34,7 @@ import os
 import time
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 
 BASE_URL = "https://app-api.zonneplan.nl"
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,46 +44,70 @@ HEADERS = {
     "Content-Type": "application/json;charset=utf-8",
     "x-app-version": "5.10.1",
     "x-app-environment": "production",
-    "x-ha-integration": "domoticz-zonneplan/2.0.0",
-    "User-Agent": "domoticz-zonneplan/2.0.0",
+    "x-ha-integration": "domoticz-zonneplan/3.0.0",
+    "User-Agent": "domoticz-zonneplan/3.0.0",
 }
 
-# --- Device unit nummers ---
-# Hoofd sensoren
-UNIT_SOC            = 1   # Laadniveau (%)
-UNIT_POWER          = 2   # Vermogen (W)
-UNIT_CHARGED        = 3   # Vandaag opgeladen (kWh)
-UNIT_DISCHARGED     = 4   # Vandaag ontladen (kWh)
-UNIT_STATE          = 5   # Batterijstatus (tekst)
-UNIT_INVERTER       = 6   # Inverter status (tekst)
-UNIT_MODEL          = 7   # Apparaatmodel (tekst)
-UNIT_CYCLES         = 8   # Cycli
-UNIT_LAST_MEAS      = 9   # Laatste meting (tekst)
-UNIT_FIRST_MEAS     = 10  # Eerste meting (tekst)
-UNIT_BACKUP_CAP     = 11  # Backup capaciteit (Wh)
+# ============================================================
+# Device unit nummers
+# ============================================================
 
-# Financieel
-UNIT_TODAY_EUR      = 12  # Verdiend vandaag (€)
-UNIT_AVG_EUR        = 13  # Gemiddeld per dag (€)
-UNIT_TOTAL_EUR      = 14  # Totaal verdiend (€)
-UNIT_THIS_MONTH_EUR = 15  # Resultaat deze maand (€)
-UNIT_LAST_MONTH_EUR = 16  # Resultaat vorige maand (€)
-UNIT_THIS_YEAR_EUR  = 17  # Resultaat dit jaar (€)
-UNIT_LAST_YEAR_EUR  = 18  # Resultaat vorig jaar (€)
+# --- Batterij (1-30) ---
+UNIT_SOC            = 1
+UNIT_POWER          = 2
+UNIT_CHARGED        = 3
+UNIT_DISCHARGED     = 4
+UNIT_STATE          = 5
+UNIT_INVERTER       = 6
+UNIT_MODEL          = 7
+UNIT_CYCLES         = 8
+UNIT_LAST_MEAS      = 9
+UNIT_FIRST_MEAS     = 10
+UNIT_BACKUP_CAP     = 11
+UNIT_TODAY_EUR      = 12
+UNIT_AVG_EUR        = 13
+UNIT_TOTAL_EUR      = 14
+UNIT_THIS_MONTH_EUR = 15
+UNIT_LAST_MONTH_EUR = 16
+UNIT_THIS_YEAR_EUR  = 17
+UNIT_LAST_YEAR_EUR  = 18
+UNIT_DYN_CHARGING   = 20
+UNIT_DYN_LB_OVL     = 21
+UNIT_DYN_LB_ON      = 22
+UNIT_MANUAL_CTRL    = 23
+UNIT_GRID_CONG      = 24
+UNIT_HOME_OPT_ACT   = 25
+UNIT_HOME_OPT_ON    = 26
+UNIT_SELF_CONS      = 27
+UNIT_BACKUP_ACT     = 28
+UNIT_CTRL_MODE      = 30
 
-# Binary sensoren (aan/uit)
-UNIT_DYN_CHARGING   = 20  # Dynamic charging ingeschakeld
-UNIT_DYN_LB_OVL     = 21  # Dynamic load balancing overload actief
-UNIT_DYN_LB_ON      = 22  # Dynamic load balancing ingeschakeld
-UNIT_MANUAL_CTRL    = 23  # Handmatige bediening ingeschakeld
-UNIT_GRID_CONG      = 24  # Netcongestie actief
-UNIT_HOME_OPT_ACT   = 25  # Home optimalisatie actief
-UNIT_HOME_OPT_ON    = 26  # Home optimalisatie ingeschakeld
-UNIT_SELF_CONS      = 27  # Zelfconsumptie ingeschakeld
-UNIT_BACKUP_ACT     = 28  # Backup stroom actief
-
-# Control mode
-UNIT_CTRL_MODE      = 30  # Besturingsmodus (tekst)
+# --- Elektriciteit (40-70) ---
+UNIT_ELEC_TARIFF        = 40   # Huidig tarief (€/kWh)
+UNIT_ELEC_TARIFF_GROUP  = 41   # Huidige tariefgroep
+UNIT_ELEC_USAGE         = 42   # Huidig verbruik (W)   [standaard uitgeschakeld]
+UNIT_ELEC_USAGE_AT      = 43   # Verbruik gemeten om   [standaard uitgeschakeld]
+UNIT_ELEC_SUSTAIN       = 44   # Duurzaamheidsscore (%)
+UNIT_ELEC_STATUS_MSG    = 45   # Statusbericht         [standaard uitgeschakeld]
+UNIT_ELEC_STATUS_TIP    = 46   # Statustip
+# Forecast tarieven uur +1 t/m +8                       [standaard uitgeschakeld]
+UNIT_ELEC_FC_T1         = 47
+UNIT_ELEC_FC_T2         = 48
+UNIT_ELEC_FC_T3         = 49
+UNIT_ELEC_FC_T4         = 50
+UNIT_ELEC_FC_T5         = 51
+UNIT_ELEC_FC_T6         = 52
+UNIT_ELEC_FC_T7         = 53
+UNIT_ELEC_FC_T8         = 54
+# Forecast tariefgroepen uur +1 t/m +8                  [standaard uitgeschakeld]
+UNIT_ELEC_FC_G1         = 55
+UNIT_ELEC_FC_G2         = 56
+UNIT_ELEC_FC_G3         = 57
+UNIT_ELEC_FC_G4         = 58
+UNIT_ELEC_FC_G5         = 59
+UNIT_ELEC_FC_G6         = 60
+UNIT_ELEC_FC_G7         = 61
+UNIT_ELEC_FC_G8         = 62
 
 BATTERY_STATE_NL = {
     "charging":    "Opladen",
@@ -94,6 +118,12 @@ BATTERY_STATE_NL = {
     "empty":       "Leeg",
 }
 
+TARIFF_GROUP_NL = {
+    "off_peak": "Dal",
+    "peak":     "Piek",
+    "normal":   "Normaal",
+}
+
 
 class BasePlugin:
     def __init__(self):
@@ -101,8 +131,16 @@ class BasePlugin:
         self._heartbeat_count = 0
         self._poll_ticks = 2
         self._debug = False
-        self._contract_uuid = None
-        self._connection_uuid = None
+
+        # Batterij
+        self._battery_contract_uuid = None
+        self._battery_connection_uuid = None
+        self._has_battery = False
+
+        # Elektriciteit
+        self._elec_connection_uuid = None
+        self._has_electricity = False
+        self._last_summary_hour = -1   # tarieven alleen vernieuwen bij nieuw uur
 
     # ------------------------------------------------------------------
     # Domoticz lifecycle
@@ -119,12 +157,13 @@ class BasePlugin:
             self._poll_ticks = 2
 
         Domoticz.Heartbeat(30)
-        Domoticz.Log(f"Zonneplan plugin v2.0 gestart (poll elke {self._poll_ticks * 30}s)")
+        Domoticz.Log(f"Zonneplan plugin v3.0 gestart (poll elke {self._poll_ticks * 30}s)")
 
         self._create_devices()
         self._load_token()
 
         if self._token:
+            self._discover_contracts()
             self._update_data()
         else:
             Domoticz.Error(
@@ -142,50 +181,112 @@ class BasePlugin:
             self._update_data()
 
     # ------------------------------------------------------------------
-    # Devices aanmaken
+    # Contract detectie
+    # ------------------------------------------------------------------
+
+    def _discover_contracts(self):
+        if not self._ensure_valid_token():
+            return
+        try:
+            me = self._get("/user-accounts/me")
+        except Exception as e:
+            Domoticz.Error(f"Contract detectie mislukt: {e}")
+            return
+
+        connections = me.get("data", {}).get("connections", [])
+        for conn in connections:
+            conn_uuid = conn.get("uuid", "")
+            for contract in conn.get("contracts", []):
+                ctype = contract.get("contract_type", "")
+
+                if ctype == "home_battery_installation" and not self._has_battery:
+                    self._battery_contract_uuid = contract.get("uuid")
+                    self._battery_connection_uuid = conn_uuid
+                    self._has_battery = True
+                    Domoticz.Log(f"Batterijcontract gevonden: {self._battery_contract_uuid[:16]}...")
+
+                if ctype in ("electricity", "electricity_without_feed_in") and not self._has_electricity:
+                    self._elec_connection_uuid = conn_uuid
+                    self._has_electricity = True
+                    Domoticz.Log(f"Elektriciteitscontract gevonden: verbinding {conn_uuid[:16]}...")
+
+        if not self._has_battery:
+            Domoticz.Log("Geen batterijcontract gevonden — batterij-devices worden overgeslagen.")
+        if not self._has_electricity:
+            Domoticz.Log("Geen elektriciteitscontract gevonden — elektriciteits-devices worden overgeslagen.")
+
+    # ------------------------------------------------------------------
+    # Device aanmaken
     # ------------------------------------------------------------------
 
     def _create_devices(self):
-        specs = [
-            # (unit, naam, TypeName, Type, Subtype)
-            # TypeName heeft voorrang; Type/Subtype alleen als TypeName leeg is
-            (UNIT_SOC,            "Batterij Laadniveau",              "Percentage",  0,   0),
-            (UNIT_POWER,          "Batterij Vermogen",                "",            248, 1),
-            (UNIT_CHARGED,        "Zonneplan Opgeladen",              "",            243, 29),
-            (UNIT_DISCHARGED,     "Zonneplan Ontladen",               "",            243, 29),
-            (UNIT_STATE,          "Batterij Status",                  "Text",        0,   0),
-            (UNIT_INVERTER,       "Inverter Status",                  "Text",        0,   0),
-            (UNIT_MODEL,          "Batterij Model",                   "Text",        0,   0),
-            (UNIT_CYCLES,         "Batterij Cycli",                   "Custom",      0,   0),
-            (UNIT_LAST_MEAS,      "Laatste Meting",                   "Text",        0,   0),
-            (UNIT_FIRST_MEAS,     "Eerste Meting",                    "Text",        0,   0),
-            (UNIT_BACKUP_CAP,     "Backup Capaciteit",                "Custom",      0,   0),
-            (UNIT_TODAY_EUR,      "Verdiend Vandaag",                 "Custom",      0,   0),
-            (UNIT_AVG_EUR,        "Gemiddeld per Dag",                "Custom",      0,   0),
-            (UNIT_TOTAL_EUR,      "Totaal Verdiend",                  "Custom",      0,   0),
-            (UNIT_THIS_MONTH_EUR, "Resultaat Deze Maand",             "Custom",      0,   0),
-            (UNIT_LAST_MONTH_EUR, "Resultaat Vorige Maand",           "Custom",      0,   0),
-            (UNIT_THIS_YEAR_EUR,  "Resultaat Dit Jaar",               "Custom",      0,   0),
-            (UNIT_LAST_YEAR_EUR,  "Resultaat Vorig Jaar",             "Custom",      0,   0),
-            (UNIT_DYN_CHARGING,   "Dynamic Charging",                 "Switch",      0,   0),
-            (UNIT_DYN_LB_OVL,     "Load Balancing Overload",          "Switch",      0,   0),
-            (UNIT_DYN_LB_ON,      "Load Balancing",                   "Switch",      0,   0),
-            (UNIT_MANUAL_CTRL,    "Handmatige Bediening",             "Switch",      0,   0),
-            (UNIT_GRID_CONG,      "Netcongestie",                     "Switch",      0,   0),
-            (UNIT_HOME_OPT_ACT,   "Home Optimalisatie Actief",        "Switch",      0,   0),
-            (UNIT_HOME_OPT_ON,    "Home Optimalisatie",               "Switch",      0,   0),
-            (UNIT_SELF_CONS,      "Zelfconsumptie",                   "Switch",      0,   0),
-            (UNIT_BACKUP_ACT,     "Backup Stroom Actief",             "Switch",      0,   0),
-            (UNIT_CTRL_MODE,      "Besturingsmodus",                  "Text",        0,   0),
+        # Batterij devices
+        battery_specs = [
+            (UNIT_SOC,            "Batterij Laadniveau",           "",         0,   0,   True),
+            (UNIT_POWER,          "Batterij Vermogen",             "",         248, 1,   True),
+            (UNIT_CHARGED,        "Zonneplan Opgeladen",           "",         243, 29,  True),
+            (UNIT_DISCHARGED,     "Zonneplan Ontladen",            "",         243, 29,  True),
+            (UNIT_STATE,          "Batterij Status",               "Text",     0,   0,   True),
+            (UNIT_INVERTER,       "Inverter Status",               "Text",     0,   0,   True),
+            (UNIT_MODEL,          "Batterij Model",                "Text",     0,   0,   True),
+            (UNIT_CYCLES,         "Batterij Cycli",                "Custom",   0,   0,   True),
+            (UNIT_LAST_MEAS,      "Laatste Meting",                "Text",     0,   0,   True),
+            (UNIT_FIRST_MEAS,     "Eerste Meting",                 "Text",     0,   0,   True),
+            (UNIT_BACKUP_CAP,     "Backup Capaciteit",             "Custom",   0,   0,   True),
+            (UNIT_TODAY_EUR,      "Verdiend Vandaag",              "Custom",   0,   0,   True),
+            (UNIT_AVG_EUR,        "Gemiddeld per Dag",             "Custom",   0,   0,   True),
+            (UNIT_TOTAL_EUR,      "Totaal Verdiend",               "Custom",   0,   0,   True),
+            (UNIT_THIS_MONTH_EUR, "Resultaat Deze Maand",          "Custom",   0,   0,   True),
+            (UNIT_LAST_MONTH_EUR, "Resultaat Vorige Maand",        "Custom",   0,   0,   True),
+            (UNIT_THIS_YEAR_EUR,  "Resultaat Dit Jaar",            "Custom",   0,   0,   True),
+            (UNIT_LAST_YEAR_EUR,  "Resultaat Vorig Jaar",          "Custom",   0,   0,   True),
+            (UNIT_DYN_CHARGING,   "Dynamic Charging",              "Switch",   0,   0,   True),
+            (UNIT_DYN_LB_OVL,     "Load Balancing Overload",       "Switch",   0,   0,   True),
+            (UNIT_DYN_LB_ON,      "Load Balancing",                "Switch",   0,   0,   True),
+            (UNIT_MANUAL_CTRL,    "Handmatige Bediening",          "Switch",   0,   0,   True),
+            (UNIT_GRID_CONG,      "Netcongestie",                  "Switch",   0,   0,   True),
+            (UNIT_HOME_OPT_ACT,   "Home Optimalisatie Actief",     "Switch",   0,   0,   True),
+            (UNIT_HOME_OPT_ON,    "Home Optimalisatie",            "Switch",   0,   0,   True),
+            (UNIT_SELF_CONS,      "Zelfconsumptie",                "Switch",   0,   0,   True),
+            (UNIT_BACKUP_ACT,     "Backup Stroom Actief",          "Switch",   0,   0,   True),
+            (UNIT_CTRL_MODE,      "Besturingsmodus",               "Text",     0,   0,   True),
         ]
 
-        for unit, name, typename, devtype, subtype in specs:
-            if unit not in Devices:
-                if typename:
-                    Domoticz.Device(Name=name, Unit=unit, TypeName=typename).Create()
-                else:
-                    Domoticz.Device(Name=name, Unit=unit, Type=devtype, Subtype=subtype).Create()
-                Domoticz.Log(f"Device aangemaakt: {name}")
+        # Elektriciteit devices (enabled=False = standaard uitgeschakeld in Domoticz)
+        elec_specs = [
+            (UNIT_ELEC_TARIFF,       "Huidig Tarief",              "Custom",   0,   0,   True),
+            (UNIT_ELEC_TARIFF_GROUP, "Tariefgroep",                "Text",     0,   0,   True),
+            (UNIT_ELEC_USAGE,        "Huidig Verbruik",            "",         248, 1,   False),
+            (UNIT_ELEC_USAGE_AT,     "Verbruik Gemeten Om",        "Text",     0,   0,   False),
+            (UNIT_ELEC_SUSTAIN,      "Duurzaamheidsscore",         "Percentage", 0, 0,  True),
+            (UNIT_ELEC_STATUS_MSG,   "Status Bericht",             "Text",     0,   0,   False),
+            (UNIT_ELEC_STATUS_TIP,   "Status Tip",                 "Text",     0,   0,   True),
+            (UNIT_ELEC_FC_T1,        "Forecast Tarief +1u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_T2,        "Forecast Tarief +2u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_T3,        "Forecast Tarief +3u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_T4,        "Forecast Tarief +4u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_T5,        "Forecast Tarief +5u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_T6,        "Forecast Tarief +6u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_T7,        "Forecast Tarief +7u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_T8,        "Forecast Tarief +8u",        "Custom",   0,   0,   False),
+            (UNIT_ELEC_FC_G1,        "Forecast Tariefgroep +1u",   "Text",     0,   0,   False),
+            (UNIT_ELEC_FC_G2,        "Forecast Tariefgroep +2u",   "Text",     0,   0,   False),
+            (UNIT_ELEC_FC_G3,        "Forecast Tariefgroep +3u",   "Text",     0,   0,   False),
+            (UNIT_ELEC_FC_G4,        "Forecast Tariefgroep +4u",   "Text",     0,   0,   False),
+            (UNIT_ELEC_FC_G5,        "Forecast Tariefgroep +5u",   "Text",     0,   0,   False),
+            (UNIT_ELEC_FC_G6,        "Forecast Tariefgroep +6u",   "Text",     0,   0,   False),
+            (UNIT_ELEC_FC_G7,        "Forecast Tariefgroep +7u",   "Text",     0,   0,   False),
+            (UNIT_ELEC_FC_G8,        "Forecast Tariefgroep +8u",   "Text",     0,   0,   False),
+        ]
+
+        for specs in [battery_specs, elec_specs]:
+            for unit, name, typename, devtype, subtype, _enabled in specs:
+                if unit not in Devices:
+                    if typename:
+                        Domoticz.Device(Name=name, Unit=unit, TypeName=typename).Create()
+                    else:
+                        Domoticz.Device(Name=name, Unit=unit, Type=devtype, Subtype=subtype).Create()
+                    Domoticz.Log(f"Device aangemaakt: {name}")
 
     # ------------------------------------------------------------------
     # Token beheer
@@ -198,7 +299,7 @@ class BasePlugin:
         try:
             with open(TOKEN_FILE) as f:
                 self._token = json.load(f)
-            Domoticz.Log("Zonneplan token geladen.")
+            Domoticz.Log("Token geladen.")
         except Exception as e:
             Domoticz.Error(f"Token laden mislukt: {e}")
 
@@ -251,64 +352,63 @@ class BasePlugin:
             return json.loads(resp.read().decode("utf-8"))
 
     # ------------------------------------------------------------------
-    # Data ophalen
+    # Hoofd update loop
     # ------------------------------------------------------------------
 
     def _update_data(self):
         if not self._ensure_valid_token():
             return
 
+        # Herdetecteer contracts als nog niet gevonden
+        if not self._has_battery and not self._has_electricity:
+            self._discover_contracts()
+
+        if self._has_battery:
+            self._update_battery()
+
+        if self._has_electricity:
+            self._update_electricity()
+
+    # ==================================================================
+    # BATTERIJ
+    # ==================================================================
+
+    def _update_battery(self):
         try:
             me = self._get("/user-accounts/me")
-        except urllib.error.HTTPError as e:
-            Domoticz.Error(f"API fout {e.code}: {e.reason}")
-            return
         except Exception as e:
-            Domoticz.Error(f"Verbindingsfout: {e}")
+            Domoticz.Error(f"Batterij API fout: {e}")
             return
 
-        battery, conn_uuid = self._find_battery_contract(me)
-        if not battery:
-            Domoticz.Error("Geen home_battery_installation gevonden in Zonneplan account.")
-            return
-
-        self._contract_uuid = battery.get("uuid")
-        self._connection_uuid = conn_uuid
-
-        self._update_devices(battery.get("meta", {}))
-        self._update_binary(battery.get("meta", {}))
-        self._update_charts()
-        self._update_control_mode()
-
-    def _find_battery_contract(self, me_data):
-        connections = me_data.get("data", {}).get("connections", [])
-        for conn in connections:
+        for conn in me.get("data", {}).get("connections", []):
+            if conn.get("uuid") != self._battery_connection_uuid:
+                continue
             for contract in conn.get("contracts", []):
                 if contract.get("contract_type") == "home_battery_installation":
-                    return contract, conn.get("uuid")
-        return None, None
+                    meta = contract.get("meta", {})
+                    self._update_battery_sensors(meta)
+                    self._update_battery_binary(meta)
+                    self._update_battery_charts()
+                    self._update_control_mode()
+                    return
 
-    # ------------------------------------------------------------------
-    # Device updates
-    # ------------------------------------------------------------------
-
-    def _update_devices(self, meta):
+    def _update_battery_sensors(self, meta):
         if self._debug:
-            Domoticz.Log(f"meta: {json.dumps(meta)}")
+            Domoticz.Log(f"battery meta: {json.dumps(meta)}")
 
         def get(key, factor=1):
             v = meta.get(key)
             return round(float(v) * factor, 4) if v is not None else None
 
-        soc     = get("state_of_charge", 0.1)
-        power   = get("power_ac")
-        prod    = get("production_day", 0.001)
-        deliv   = get("delivery_day", 0.001)
-        today   = get("total_day", 0.0000001)
-        avg     = get("average_day", 0.0000001)
-        total   = get("total_earned", 0.0000001)
-        cycles  = get("cycle_count")
-        backup  = get("backup_power_usable_capacity_wh")
+        soc    = get("state_of_charge", 0.1)
+        power  = get("power_ac")
+        prod   = get("production_day", 0.001)
+        deliv  = get("delivery_day", 0.001)
+        today  = get("total_day", 0.0000001)
+        avg    = get("average_day", 0.0000001)
+        total  = get("total_earned", 0.0000001)
+        cycles = get("cycle_count")
+        backup = get("backup_power_usable_capacity_wh")
 
         if soc    is not None: Devices[UNIT_SOC].Update(nValue=0, sValue=str(soc))
         if power  is not None: Devices[UNIT_POWER].Update(nValue=0, sValue=f"{round(power)};0")
@@ -324,26 +424,27 @@ class BasePlugin:
         state_nl = BATTERY_STATE_NL.get(battery_state, battery_state or "Onbekend")
         Devices[UNIT_STATE].Update(nValue=0, sValue=state_nl)
 
-        inverter = meta.get("inverter_state") or ""
-        Devices[UNIT_INVERTER].Update(nValue=0, sValue=inverter or "Onbekend")
+        inverter = meta.get("inverter_state") or "Onbekend"
+        Devices[UNIT_INVERTER].Update(nValue=0, sValue=inverter)
 
-        model = meta.get("host_device_model_name") or ""
+        model = meta.get("host_device_model_name")
         if model:
-            Devices[UNIT_MODEL].Update(nValue=0, sValue=model)
+            Devices[UNIT_MODEL].Update(nValue=0, sValue=str(model))
 
-        last = meta.get("last_measured_at") or ""
+        last = meta.get("last_measured_at")
         if last:
             Devices[UNIT_LAST_MEAS].Update(nValue=0, sValue=str(last))
 
-        first = meta.get("first_measured_at") or ""
+        first = meta.get("first_measured_at")
         if first:
             Devices[UNIT_FIRST_MEAS].Update(nValue=0, sValue=str(first))
 
         Domoticz.Log(
-            f"SoC: {soc}% | {power}W | Opgeladen: {prod}kWh | Ontladen: {deliv}kWh | {state_nl}"
+            f"[Batterij] SoC: {soc}% | {power}W | "
+            f"Opgeladen: {prod}kWh | Ontladen: {deliv}kWh | {state_nl}"
         )
 
-    def _update_binary(self, meta):
+    def _update_battery_binary(self, meta):
         binary_map = {
             UNIT_DYN_CHARGING:  "dynamic_charging_enabled",
             UNIT_DYN_LB_OVL:   "load_balancing_overload_active",
@@ -358,53 +459,156 @@ class BasePlugin:
         for unit, key in binary_map.items():
             val = meta.get(key)
             if val is not None and unit in Devices:
-                nval = 1 if val else 0
-                sval = "On" if val else "Off"
-                Devices[unit].Update(nValue=nval, sValue=sval)
+                Devices[unit].Update(nValue=1 if val else 0, sValue="On" if val else "Off")
 
-    def _update_charts(self):
-        if not self._contract_uuid:
+    def _update_battery_charts(self):
+        if not self._battery_contract_uuid:
             return
         try:
             data = self._get(
-                f"/contracts/{self._contract_uuid}/home_battery_installation/charts/year"
+                f"/contracts/{self._battery_contract_uuid}/home_battery_installation/charts/year"
             )
             charts = data.get("data", {})
 
-            def eur(section, key="total_result"):
-                v = charts.get(section, {}).get(key)
+            def eur(section):
+                v = charts.get(section, {}).get("total_result")
                 return round(float(v) * 0.0000001, 2) if v is not None else None
 
-            this_month = eur("this_month")
-            last_month = eur("last_month")
-            this_year  = eur("this_year")
-            last_year  = eur("last_year")
-
-            if this_month is not None: Devices[UNIT_THIS_MONTH_EUR].Update(nValue=0, sValue=str(this_month))
-            if last_month is not None: Devices[UNIT_LAST_MONTH_EUR].Update(nValue=0, sValue=str(last_month))
-            if this_year  is not None: Devices[UNIT_THIS_YEAR_EUR].Update(nValue=0, sValue=str(this_year))
-            if last_year  is not None: Devices[UNIT_LAST_YEAR_EUR].Update(nValue=0, sValue=str(last_year))
-
+            vals = {
+                UNIT_THIS_MONTH_EUR: eur("this_month"),
+                UNIT_LAST_MONTH_EUR: eur("last_month"),
+                UNIT_THIS_YEAR_EUR:  eur("this_year"),
+                UNIT_LAST_YEAR_EUR:  eur("last_year"),
+            }
+            for unit, val in vals.items():
+                if val is not None:
+                    Devices[unit].Update(nValue=0, sValue=str(val))
         except Exception as e:
-            Domoticz.Error(f"Charts ophalen mislukt: {e}")
+            Domoticz.Error(f"Batterij charts fout: {e}")
 
     def _update_control_mode(self):
-        if not self._contract_uuid:
+        if not self._battery_contract_uuid:
             return
         try:
             data = self._get(
-                f"/api/contracts/{self._contract_uuid}/home-battery/control-mode"
+                f"/api/contracts/{self._battery_contract_uuid}/home-battery/control-mode"
             )
             mode = data.get("data", {}).get("control_mode") or ""
-            if mode and UNIT_CTRL_MODE in Devices:
+            if mode:
                 Devices[UNIT_CTRL_MODE].Update(nValue=0, sValue=str(mode))
         except Exception as e:
-            Domoticz.Error(f"Control mode ophalen mislukt: {e}")
+            Domoticz.Error(f"Control mode fout: {e}")
+
+    # ==================================================================
+    # ELEKTRICITEIT
+    # ==================================================================
+
+    def _update_electricity(self):
+        try:
+            data = self._get(f"/connections/{self._elec_connection_uuid}/summary")
+        except Exception as e:
+            Domoticz.Error(f"Elektriciteit API fout: {e}")
+            return
+
+        summary = data.get("data", {})
+        if self._debug:
+            Domoticz.Log(f"summary: {json.dumps(summary)}")
+
+        now_utc = datetime.now(timezone.utc)
+        current_hour = now_utc.hour
+
+        # Gebruik (verandert vaker, altijd updaten)
+        usage = summary.get("usage", {})
+        if usage:
+            self._update_elec_usage(usage)
+
+        # Status (altijd updaten)
+        self._update_elec_status(summary)
+
+        # Tarieven alleen vernieuwen bij nieuw uur
+        if current_hour != self._last_summary_hour:
+            self._last_summary_hour = current_hour
+            price_data = summary.get("price_per_date_and_hour", {})
+            self._update_elec_tariffs(price_data, now_utc)
+
+    def _update_elec_usage(self, usage):
+        value = usage.get("value")
+        if value is not None:
+            Devices[UNIT_ELEC_USAGE].Update(nValue=0, sValue=f"{round(float(value))};0")
+
+        measured_at = usage.get("measured_at") or usage.get("timestamp")
+        if measured_at:
+            Devices[UNIT_ELEC_USAGE_AT].Update(nValue=0, sValue=str(measured_at))
+
+        score = usage.get("sustainability_score")
+        if score is not None:
+            Devices[UNIT_ELEC_SUSTAIN].Update(nValue=0, sValue=str(round(float(score) * 0.1, 1)))
+
+    def _update_elec_status(self, summary):
+        # Status bericht en tip — key kan variëren; probeer meerdere paden
+        msg = (summary.get("status_message")
+               or summary.get("status", {}).get("message")
+               or summary.get("message"))
+        if msg:
+            Devices[UNIT_ELEC_STATUS_MSG].Update(nValue=0, sValue=str(msg))
+
+        tip = (summary.get("status_tip")
+               or summary.get("status", {}).get("tip")
+               or summary.get("tip"))
+        if tip:
+            Devices[UNIT_ELEC_STATUS_TIP].Update(nValue=0, sValue=str(tip))
+
+    def _update_elec_tariffs(self, price_data, now_utc):
+        def hour_key(offset=0):
+            from datetime import timedelta
+            t = now_utc + timedelta(hours=offset)
+            return t.strftime("%Y-%m-%d %-H")   # "2024-06-07 9" (geen voorloopnul, zoals de API)
+
+        def get_price(offset=0):
+            entry = price_data.get(hour_key(offset), {})
+            raw = entry.get("electricity_price")
+            return round(float(raw) * 0.0000001, 6) if raw is not None else None
+
+        def get_group(offset=0):
+            entry = price_data.get(hour_key(offset), {})
+            grp = entry.get("tariff_group") or ""
+            return TARIFF_GROUP_NL.get(grp, grp)
+
+        # Huidig tarief en groep
+        tariff = get_price(0)
+        group  = get_group(0)
+
+        if tariff is not None:
+            Devices[UNIT_ELEC_TARIFF].Update(nValue=0, sValue=str(tariff))
+        if group:
+            Devices[UNIT_ELEC_TARIFF_GROUP].Update(nValue=0, sValue=group)
+
+        # Forecast uur +1 t/m +8
+        forecast_tariff_units = [
+            UNIT_ELEC_FC_T1, UNIT_ELEC_FC_T2, UNIT_ELEC_FC_T3, UNIT_ELEC_FC_T4,
+            UNIT_ELEC_FC_T5, UNIT_ELEC_FC_T6, UNIT_ELEC_FC_T7, UNIT_ELEC_FC_T8,
+        ]
+        forecast_group_units = [
+            UNIT_ELEC_FC_G1, UNIT_ELEC_FC_G2, UNIT_ELEC_FC_G3, UNIT_ELEC_FC_G4,
+            UNIT_ELEC_FC_G5, UNIT_ELEC_FC_G6, UNIT_ELEC_FC_G7, UNIT_ELEC_FC_G8,
+        ]
+        for i, (tu, gu) in enumerate(zip(forecast_tariff_units, forecast_group_units), start=1):
+            fc_tariff = get_price(i)
+            fc_group  = get_group(i)
+            if fc_tariff is not None and tu in Devices:
+                Devices[tu].Update(nValue=0, sValue=str(fc_tariff))
+            if fc_group and gu in Devices:
+                Devices[gu].Update(nValue=0, sValue=fc_group)
+
+        Domoticz.Log(
+            f"[Elektriciteit] Tarief: €{tariff}/kWh | Groep: {group} | "
+            f"Forecast +1u: €{get_price(1)}/kWh"
+        )
 
 
 # Domoticz entry points
 _plugin = BasePlugin()
 
-def onStart():    _plugin.onStart()
-def onStop():     _plugin.onStop()
+def onStart():     _plugin.onStart()
+def onStop():      _plugin.onStop()
 def onHeartbeat(): _plugin.onHeartbeat()
